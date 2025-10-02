@@ -6,7 +6,7 @@
 #include <cmath>
 #include <iomanip>
 
-#define GLEW_STATIC // Статическая линковка GLEW для простоты сборки.
+#define GLEW_STATIC 
 #include <GL/glew.h>
 #include <GLFW/glfw3.h>
 #include <glm/glm.hpp>
@@ -109,11 +109,11 @@ public:
     void setShaderProgram(GLuint programID) { shaderProgramID = programID; } // Установка шейдерной программы для использования этой моделью.
 };
 
-// Структура, хранящая все состояние приложения (вместо глобальных переменных).
+// Структура, хранящая все состояние приложения
 struct AppState {
-    int winWidth = 800, winHeight = 600;
+    int winWidth = 800, winHeight = 800;
     int currentTask = 1;
-    float pointSmoothSize = 188.0f;
+    float pointSmoothSize = 20.0f;
     float lineWidth = 4.0f;
     int lastPrintedPointSize = 0; 
     int lastPrintedLineWidth = 0; 
@@ -122,7 +122,8 @@ struct AppState {
     Task5Mode task5Mode = Task5Mode::Triangles;
     Task8Mode task8Mode = Task8Mode::Vertices;
     ToningMode toningMode = ToningMode::Flat;
-    Model* task4And5_triangles = nullptr, * task4And5_strip = nullptr, * task4And5_fan = nullptr; // Указатели на модели для динамической смены шейдеров.
+    Model* task4And5_triangles = nullptr, * task4And5_strip = nullptr; 
+    Model* task4And5_fan1 = nullptr, * task4And5_fan2 = nullptr;
     Model* task7And8_flat = nullptr, * task7And8_smooth = nullptr;
     GLuint smoothShaderProgram = 0, flatShaderProgram = 0; // ID скомпилированных шейдерных программ.    
 };
@@ -147,30 +148,28 @@ int main() {
 
     printHelp(); // Вывод справки по управлению в консоль.
 
-    // --- ИНИЦИАЛИЗАЦИЯ РЕСУРСОВ ---
+    // Инициализация ресурсов
     state.smoothShaderProgram = createShaderProgram(VERTEX_SHADER_SMOOTH, FRAGMENT_SHADER_SMOOTH); // Компиляция шейдеров при запуске.
     state.flatShaderProgram = createShaderProgram(VERTEX_SHADER_FLAT, FRAGMENT_SHADER_FLAT);
 
     // Создание и настройка всех моделей для каждого задания.
-    const int N = 6;
     Model task1And2Model;
-    task1And2Model.load_coords(getRegularPolygonVerticesCoordinates(N));
-    task1And2Model.load_colors(std::vector<glm::vec3>(N, glm::vec3(0.8f, 0.1f, 0.1f)));
+    const int num_sides_task1 = 7;
+    task1And2Model.load_coords(getRegularPolygonVerticesCoordinates(num_sides_task1));
+    task1And2Model.load_colors(std::vector<glm::vec3>(num_sides_task1, glm::vec3(0.8f, 0.8f, 0.8f)));
     task1And2Model.setShaderProgram(state.smoothShaderProgram);
 
     Model task3Model;
-    task3Model.load_coords({
-        {-0.8f, 0.8f, 0.0f}, {-0.8f, 0.0f, 0.0f}, {-0.4f, 0.0f, 0.0f},
-        {-0.55f, 0.2f, 0.0f}, {-0.2f, 0.8f, 0.0f}, {0.0f, 0.35f, 0.0f},
-        {-0.2f, 0.0f, 0.0f}, {0.8f, 0.0f, 0.0f}
-        });
-    task3Model.load_colors(std::vector<glm::vec3>(8, glm::vec3(0.1, 0.8, 0.1)));
+    std::vector<glm::vec3> task3_vertices = {
+        {-1, 0.5, 0},   {-0.8, -0.3, 0}, {-0.6, 0.2, 0}, {-0.1, 0.2, 0},
+        {-0.3, 0.8, 0}, {1, 0.8, 0},     {0.2, -0.3, 0} };
+    task3Model.load_coords(task3_vertices);
+    task3Model.load_colors(std::vector<glm::vec3>(task3_vertices.size(), glm::vec3(0.8, 0.8, 0.8)));
     task3Model.setShaderProgram(state.smoothShaderProgram);
 
     std::vector<glm::vec3> fig2Vertices = {
-        {0.0f, 0.0f, 0.0f}, {0.2f, -0.8f, 0.0f}, {-0.4f, -0.6f, 0.0f}, {-0.5f, 0.1f, 0.0f},
-        {-0.25f, 0.6f, 0.0f}, {0.2f, 0.4f, 0.0f}, {0.6f, 0.6f, 0.0f}, {0.6f, 0.0f, 0.0f},
-    };
+         {0.2f, 0.0f, 0},  {0.6f, 0.0f, 0},  {0.6f, -0.3f, 0}, {-0.5f, -0.3f, 0},
+         {-0.1f, 0.2f, 0}, {-0.8f, 0.8f, 0}, {0.8f, 0.8f, 0},  {0.2f, 0.5f, 0} };
     std::vector<glm::vec3> fig2Colors;
     for (size_t i = 0; i < fig2Vertices.size(); ++i) {
         fig2Colors.push_back(glm::vec3((rand() % 100) / 100.0f, (rand() % 100) / 100.0f, (rand() % 100) / 100.0f));
@@ -178,39 +177,60 @@ int main() {
 
     Model task4Model;
     task4Model.load_coords(fig2Vertices);
-    task4Model.load_colors(fig2Colors);
+    task4Model.load_colors(std::vector<glm::vec3>(fig2Vertices.size(), glm::vec3(0.8, 0.8, 0.8)));
     task4Model.setShaderProgram(state.smoothShaderProgram);
 
-    Model task5Triangles, task5Strip, task5Fan;
+    Model task5Triangles, task5Strip, task5Fan1, task5Fan2;
     task5Triangles.load_coords(fig2Vertices); task5Triangles.load_colors(fig2Colors);
-    task5Triangles.load_indices({ 1, 2, 3, 3, 0, 1, 3, 5, 0, 3, 5, 4, 0, 7, 5, 5, 6, 7 });
+    task5Triangles.load_indices({ 
+        7, 6, 5,   
+        5, 4, 7,  
+        7, 4, 0,
+        0, 4, 3,
+        3, 2, 0,
+        0, 2, 1
+        });
     task5Strip.load_coords(fig2Vertices); task5Strip.load_colors(fig2Colors);
-    task5Strip.load_indices({ 6, 7, 5, 0, 4, 1, 3, 2 });
-    task5Fan.load_coords(fig2Vertices); task5Fan.load_colors(fig2Colors);
-    task5Fan.load_indices({ 0, 7, 6, 5, 4, 3, 2, 1 });
-    state.task4And5_triangles = &task5Triangles; state.task4And5_strip = &task5Strip; state.task4And5_fan = &task5Fan;
+    task5Strip.load_indices({ 6, 5, 7, 4, 0, 3, 1, 2});
+    task5Fan1.load_coords(fig2Vertices); task5Fan1.load_colors(fig2Colors);
+    task5Fan1.load_indices({ 7, 6, 5, 4, 0 });
+    task5Fan2.load_coords(fig2Vertices); task5Fan2.load_colors(fig2Colors);
+    task5Fan2.load_indices({ 0, 4, 3, 2, 1 });
+    state.task4And5_triangles = &task5Triangles;
+    state.task4And5_strip = &task5Strip;
+    state.task4And5_fan1 = &task5Fan1; 
+    state.task4And5_fan2 = &task5Fan2;
 
     Model task6Model;
-    task6Model.load_coords(getRegularPolygonVerticesCoordinates(N));
+    const int num_sides_task6 = 7; 
+    task6Model.load_coords(getRegularPolygonVerticesCoordinates(num_sides_task6));
     std::vector<glm::vec3> task6Colors;
-    for (int i = 0; i < N; ++i) {
+    for (int i = 0; i < num_sides_task6; ++i) {
         task6Colors.push_back(glm::vec3((rand() % 100) / 100.0f, (rand() % 100) / 100.0f, (rand() % 100) / 100.0f));
     }
     task6Model.load_colors(task6Colors);
-    task6Model.load_indices({ 0, 1, 2, 3, 4, 5 });
+    task6Model.load_indices({ 0, 1, 2, 3, 4, 5, 6 });
     task6Model.setShaderProgram(state.flatShaderProgram);
 
     Model task7And8Model_flat, task7And8Model_smooth;
     std::vector<glm::vec3> fig3Vertices = {
-        {0.0f, 0.0f, 0.0f},{-0.5f, 0.0f, 0.0f},{-0.5f, 0.6f, 0.0f},{-0.1f, 0.5f, 0.0f},
-        {0.7f, 0.8f, 0.0f},{0.8f, 0.0f, 0.0f},{0.2f, 0.0f, 0.0f},{0.2f, 0.4f, 0.0f},
-        {0.0f, 0.4f, 0.0f},{-0.2f, 0.2f, 0.0f},
+        {0.2, -0.2, 0}, {0.7, 0.2, 0}, {0.5, 0.7, 0},
+        {-0.3, 0.9, 0}, {-0.8, 0.1, 0}, {-0.4, -0.3, 0},
+        {-0.1, -0.1, 0}, {-0.5, 0.0, 0}, {0.0, 0.6, 0}
     };
     std::vector<glm::vec3> fig3Colors;
-    for (int i = 0; i < 10; ++i) {
+    for (int i = 0; i < 9; ++i) {
         fig3Colors.push_back(glm::vec3((rand() % 100) / 100.0f, (rand() % 100) / 100.0f, (rand() % 100) / 100.0f));
     }
-    std::vector<GLuint> fig3Indices = { 0, 1, 9, 1, 9, 2, 2, 9, 3, 3, 8, 8, 3, 8, 7, 3, 7, 4, 7, 4, 6, 4, 6, 5, 3, 9, 8 };
+    std::vector<GLuint> fig3Indices = {
+        0, 1, 8,
+        8, 1, 2,
+        8, 2, 3,
+        3, 8, 4,
+        4, 7, 5,
+        5, 6, 7,
+        4, 7, 8
+    };
     task7And8Model_flat.load_coords(fig3Vertices); task7And8Model_flat.load_colors(fig3Colors);
     task7And8Model_flat.load_indices(fig3Indices);
     task7And8Model_flat.setShaderProgram(state.flatShaderProgram);
@@ -219,7 +239,7 @@ int main() {
     task7And8Model_smooth.setShaderProgram(state.smoothShaderProgram);
     state.task7And8_flat = &task7And8Model_flat; state.task7And8_smooth = &task7And8Model_smooth;
 
-    float lastFrame = 0.0f; // Переменная для расчета времени кадра (deltaTime).
+    float lastFrame = 0.0f; // Переменная для расчета времени кадра 
 
     // Главный цикл рендеринга, работает до закрытия окна.
     while (!glfwWindowShouldClose(window)) {
@@ -255,16 +275,23 @@ int main() {
             break;
         case 5: // Задание 5: отрисовка фигуры разными методами.
         {
-            Model* chosenModel = nullptr;
-            GLuint renderMode = GL_TRIANGLES;
-            if (state.task5Mode == Task5Mode::Triangles) { chosenModel = state.task4And5_triangles; renderMode = GL_TRIANGLES; }
-            else if (state.task5Mode == Task5Mode::Strip) { chosenModel = state.task4And5_strip; renderMode = GL_TRIANGLE_STRIP; }
-            else if (state.task5Mode == Task5Mode::Fan) { chosenModel = state.task4And5_fan; renderMode = GL_TRIANGLE_FAN; }
+            GLuint shader = (state.toningMode == ToningMode::Flat) ? state.flatShaderProgram : state.smoothShaderProgram;
 
-            if (chosenModel) {
-                GLuint shader = (state.toningMode == ToningMode::Flat) ? state.flatShaderProgram : state.smoothShaderProgram;
-                chosenModel->setShaderProgram(shader);
-                chosenModel->render(renderMode);
+            if (state.task5Mode == Task5Mode::Triangles) {
+                state.task4And5_triangles->setShaderProgram(shader);
+                state.task4And5_triangles->render(GL_TRIANGLES);
+            }
+            else if (state.task5Mode == Task5Mode::Strip) {
+                state.task4And5_strip->setShaderProgram(shader);
+                state.task4And5_strip->render(GL_TRIANGLE_STRIP);
+            }
+            else if (state.task5Mode == Task5Mode::Fan) {
+                // Рисуем оба веера, чтобы покрыть всю фигуру
+                state.task4And5_fan1->setShaderProgram(shader);
+                state.task4And5_fan1->render(GL_TRIANGLE_FAN);
+
+                state.task4And5_fan2->setShaderProgram(shader);
+                state.task4And5_fan2->render(GL_TRIANGLE_FAN);
             }
         }
         break;
@@ -276,7 +303,7 @@ int main() {
             else { state.task7And8_smooth->render(GL_TRIANGLES); }
             break;
         case 8: // Задание 8: разные режимы отображения граней.
-            glPointSize(4.0f);
+            glPointSize(14.0f);
             if (state.task8Mode == Task8Mode::Vertices) { glPolygonMode(GL_FRONT_AND_BACK, GL_POINT); }
             else if (state.task8Mode == Task8Mode::FillFrontLineBack) { glPolygonMode(GL_FRONT, GL_FILL); glPolygonMode(GL_BACK, GL_LINE); }
             else if (state.task8Mode == Task8Mode::Wireframe) { glPolygonMode(GL_FRONT_AND_BACK, GL_LINE); }
@@ -293,29 +320,25 @@ int main() {
 }
 
 // Функция выводит в консоль подробную инструкцию по управлению.
-void printHelp() {
-    std::cout << "---------------------------------------------------\n";
-    std::cout << "               Application Controls                \n";
-    std::cout << "---------------------------------------------------\n";
-    std::cout << "General Controls:\n";
+void printHelp() {   
     std::cout << "  [1] - [8]    : Switch Task\n";
     std::cout << "  [V]          : Enable Flat Shading\n";
     std::cout << "  [B]          : Enable Smooth Shading\n";
     std::cout << "  [ESC]        : Close Application\n\n";
-    std::cout << "Task-Specific Controls:\n";
-    std::cout << "  Task 1 (Points):\n";
-    std::cout << "    [UP/DOWN]  : Increase/decrease point size (hold down)\n";
-    std::cout << "  Task 2 (Lines):\n";
-    std::cout << "    [UP/DOWN]  : Increase/decrease line width (hold down)\n";
-    std::cout << "  Task 5 (Filled Shape):\n";
+    std::cout << "\n";
+    std::cout << "  Task 1:\n";
+    std::cout << "    [UP/DOWN]  : Increase/decrease point size\n";
+    std::cout << "  Task 2:\n";
+    std::cout << "    [UP/DOWN]  : Increase/decrease line width)\n";
+    std::cout << "  Task 5:\n";
     std::cout << "    [Z]        : 'Triangles' mode\n";
     std::cout << "    [X]        : 'Triangle Strip' mode\n";
     std::cout << "    [C]        : 'Triangle Fan' mode\n";
-    std::cout << "  Task 8 (Display Modes):\n";
+    std::cout << "  Task 8:\n";
     std::cout << "    [Z]        : 'Vertices Only' mode\n";
     std::cout << "    [X]        : 'Fill Front, Line Back' mode\n";
     std::cout << "    [C]        : 'Wireframe' mode\n";
-    std::cout << "---------------------------------------------------\n";
+    std::cout << "\n";
 }
 
 // Функция обрабатывает удержание клавиш с задержкой.
@@ -388,13 +411,11 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
         if (key == GLFW_KEY_C) { state->task8Mode = Task8Mode::Wireframe; std::cout << "Task 8 Mode: Wireframe\n"; }
     }
 
-    // --- ИСПРАВЛЕННАЯ ЛОГИКА ДЛЯ UP/DOWN ---
     if (state->currentTask == 1) { // Для размера точек
         if (key == GLFW_KEY_UP) state->pointSmoothSize++;
         if (key == GLFW_KEY_DOWN) state->pointSmoothSize--;
         if (state->pointSmoothSize < 1.0f) state->pointSmoothSize = 1.0f;
 
-        // Сразу печатаем и ОБНОВЛЯЕМ запомненное значение, чтобы processInput не напечатал его снова.
         state->lastPrintedPointSize = static_cast<int>(state->pointSmoothSize);
         std::cout << "New point size: " << state->lastPrintedPointSize << std::endl;
     }
@@ -407,7 +428,6 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
         state->lastPrintedLineWidth = static_cast<int>(state->lineWidth);
         std::cout << "New line width: " << state->lastPrintedLineWidth << std::endl;
     }
-    // --- КОНЕЦ ИСПРАВЛЕНИЙ ---
 
     if (key == GLFW_KEY_V) { state->toningMode = ToningMode::Flat; std::cout << ">> Shading Mode: Flat\n"; }
     if (key == GLFW_KEY_B) { state->toningMode = ToningMode::Smooth; std::cout << ">> Shading Mode: Smooth\n"; }
@@ -465,7 +485,7 @@ GLFWwindow* InitAll(int w, int h, void* user_data) {
     glEnable(GL_BLEND); // Включение смешивания цветов, необходимо для корректной работы сглаживания.
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
-    glClearColor(0.0f, 0.0f, 0.0f, 1.0f); // Установка черного цвета фона, как в оригинале.
+    glClearColor(0.0f, 0.0f, 0.0f, 1.0f); 
 
     return window;
 }
